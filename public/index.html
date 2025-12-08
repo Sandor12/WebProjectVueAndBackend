@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0b1220">
+  <title>Project Part1+2 Vue CDN with API</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+  <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+</head>
+<body>
+  <main>
+    <h1>Project Part 1+2 : Vue js with Backend API</h1>
+
+    <section id="app" class="app-container">
+      <div v-if="loading" class="loading">Loading data from API...</div>
+      <div v-else-if="error" class="error">{{ error }}</div>
+      
+      <div v-else class="app-grid">
+        <div class="card" @mouseenter="pauseRotate" @mouseleave="resumeRotate">
+          <img :src="current.img" :alt="current.title" class="card-image">
+          <div class="card-body">
+            <h2 class="card-toggle" @click="toggle()" title="click to toggle">{{ showTitle ? current.title : current.def }}</h2>
+
+            <div class="controls">
+              <button @click="prevItem" aria-label="Previous" :disabled="items.length === 0">&larr; Prev</button>
+              <span class="index">{{ idx + 1 }} / {{ items.length }}</span>
+              <button @click="nextItem" aria-label="Next" :disabled="items.length === 0">Next &rarr;</button>
+            </div>
+
+          </div>
+        </div>
+
+        <aside class="sidebar" aria-label="Items list">
+          <ul class="item-list">
+            <li v-for="(it, i) in items" :key="i" :class="{ active: i === idx }" @click="goTo(i)">
+              <img :src="it.img" :alt="it.title" class="thumb">
+              <div class="meta">
+                <strong class="meta-title">{{ it.title }}</strong>
+                <small class="meta-desc">{{ it.def }}</small>
+              </div>
+            </li>
+          </ul>
+        </aside>
+      </div>
+
+      <p v-if="!loading && !error" class="hint">Click on title/description to toggle between title and description</p>
+    </section>
+
+  </main>
+
+  <footer>
+      <p>Made by Alexis Delavis</p>
+  </footer>
+
+  <script>
+    const { createApp } = Vue;
+
+    createApp({
+      data() {
+        return {
+          items: [],
+          idx: 0,
+          showTitle: true,
+          _boundOnKey: null,
+          loading: true,
+          error: null,
+          apiUrl: '',
+          autoRotate: true,
+          rotateInterval: 8000,
+          _rotateTimer: null
+        };
+      },
+      computed: {
+        current() {
+          return this.items[this.idx] || { title: '-', def: '-', img: '' };
+        }
+      },
+      async mounted() {
+        this._boundOnKey = this._onKey.bind(this);
+        window.addEventListener('keydown', this._boundOnKey);
+        
+        // Fetch data from API
+        await this.loadData();
+        
+        if (this.autoRotate && !this.error) this.startRotate();
+        this.scrollActive();
+      },
+      beforeUnmount() {
+        if (this._boundOnKey) {
+          window.removeEventListener('keydown', this._boundOnKey);
+        }
+        this.stopRotate();
+      },
+      methods: {
+        async loadData() {
+          try {
+            this.loading = true;
+            this.error = null;
+            
+            // Fetch from same server (relative path)
+            const response = await fetch('/items');
+            
+            if (!response.ok) {
+              throw new Error(`HTTP error! status: ${response.status}`);
+            }
+            
+            const data = await response.json();
+            this.items = data.items || [];
+            
+            if (this.items.length === 0) {
+              this.error = 'No items found';
+            }
+            
+            console.log('Loaded', this.items.length, 'items from API');
+          } catch (err) {
+            console.error('Error loading data:', err);
+            this.error = 'Failed to load data from API';
+          } finally {
+            this.loading = false;
+          }
+        },
+        goTo(index) {
+          if (!this.items || this.items.length === 0) return;
+          this.idx = index % this.items.length;
+          this.showTitle = true;
+          if (this.autoRotate) {
+            this.stopRotate();
+            this.startRotate();
+          }
+          this.scrollActive();
+        },
+        _onKey(event) {
+          if (!this.items || this.items.length === 0) return;
+          if (event.key === 'ArrowRight') this.nextItem();
+          if (event.key === 'ArrowLeft') this.prevItem();
+        },
+        toggle() {
+          this.showTitle = !this.showTitle;
+        },
+        nextItem() {
+          if (this.items.length === 0) return;
+          this.idx = (this.idx + 1) % this.items.length;
+          this.showTitle = true;
+          if (this.autoRotate) {
+            this.stopRotate();
+            this.startRotate();
+          }
+          this.scrollActive();
+        },
+        prevItem() {
+          if (this.items.length === 0) return;
+          this.idx = (this.idx - 1 + this.items.length) % this.items.length;
+          this.showTitle = true;
+          if (this.autoRotate) {
+            this.stopRotate();
+            this.startRotate();
+          }
+          this.scrollActive();
+        },
+        startRotate() {
+          this.stopRotate();
+          this._rotateTimer = setInterval(() => {
+            this.idx = (this.idx + 1) % (this.items.length || 1);
+            this.showTitle = true;
+            this.scrollActive();
+          }, this.rotateInterval);
+        },
+        stopRotate() {
+          if (this._rotateTimer) {
+            clearInterval(this._rotateTimer);
+            this._rotateTimer = null;
+          }
+        },
+        pauseRotate() {
+          this.stopRotate();
+        },
+        resumeRotate() {
+          if (this.autoRotate) this.startRotate();
+        },
+        scrollActive() {
+          this.$nextTick(() => {
+            const list = document.querySelector('.sidebar .item-list');
+            if (!list) return;
+            const active = list.querySelector('li.active');
+            if (active) {
+              active.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+            }
+          });
+        }
+      }
+    }).mount('#app');
+  </script>
+</body>
+</html>
