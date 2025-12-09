@@ -1,0 +1,23 @@
+CREATE DATABASE IF NOT EXISTS ChallengeDB;
+
+USE ChallengeDB;
+
+CREATE TABLE Employees (
+    Emp_ID INT AUTO_INCREMENT PRIMARY KEY,
+    First_Name VARCHAR(40) NOT NULL,
+    Last_Name VARCHAR(40) NOT NULL,
+    Email VARCHAR(50) NOT NULL UNIQUE,
+    Job_Title VARCHAR(40) NOT NULL,
+    Hire_Date DATE NOT NULL,
+    Salary DECIMAL(10, 2) NOT NULL,
+    CHECK (Salary >= 15000 AND Salary <= 50000)
+);
+
+CREATE TABLE Customers (
+    Cust_ID INT AUTO_INCREMENT PRIMARY KEY,
+    First_Name VARCHAR(40) NOT NULL,
+    Last_Name VARCHAR(40) NOT NULL,
+    Email VARCHAR(50) NOT NULL UNIQUE,
+    Province VARCHAR(40) NOT NULL DEFAULT 'Ontario',
+    City VARCHAR(40) NOT NULL
+);
